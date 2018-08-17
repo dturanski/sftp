@@ -29,7 +29,6 @@ import org.springframework.cloud.stream.annotation.EnableBinding;
 import org.springframework.cloud.stream.app.file.FileConsumerProperties;
 import org.springframework.cloud.stream.app.file.FileReadingMode;
 import org.springframework.cloud.stream.app.file.FileUtils;
-import org.springframework.cloud.stream.app.file.InputStreamPersister;
 import org.springframework.cloud.stream.app.file.remote.RemoteFileDeletingTransactionSynchronizationProcessor;
 import org.springframework.cloud.stream.app.sftp.source.metadata.SftpSourceIdempotentReceiverConfiguration;
 import org.springframework.cloud.stream.app.sftp.source.tasklauncher.SftpSourceTaskLauncherConfiguration;
@@ -98,10 +97,8 @@ public class SftpSourceConfiguration {
 	@Autowired
 	private SftpSourceProperties properties;
 
-
 	@Autowired
 	private ConcurrentMetadataStore metadataStore;
-
 
 	@Bean
 	public MessageChannel sftpFileListChannel() {
