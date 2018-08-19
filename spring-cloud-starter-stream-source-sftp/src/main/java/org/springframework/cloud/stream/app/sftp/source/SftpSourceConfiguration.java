@@ -211,8 +211,10 @@ public class SftpSourceConfiguration {
 	}
 
 	@Bean
-	public IntegrationFlow sftpProcessOutput( FunctionProperties functionProperties) {
-		IntegrationFlowBuilder flowBuilder = IntegrationFlows.from(processOutput());
+	public IntegrationFlow sftpProcessOutput() {
+		IntegrationFlowBuilder flowBuilder = IntegrationFlows
+			.from(processOutput())
+			.bridge();
 		if (functionSupport != null) {
 			functionSupport.andThenFunction(flowBuilder,source.output());
 		}

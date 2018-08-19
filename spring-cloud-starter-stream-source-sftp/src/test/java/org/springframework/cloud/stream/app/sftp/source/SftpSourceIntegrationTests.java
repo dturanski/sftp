@@ -28,6 +28,7 @@ import java.io.File;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import org.hamcrest.Matchers;
 import org.junit.Test;
@@ -39,6 +40,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.stream.app.test.sftp.SftpTestSupport;
 import org.springframework.cloud.stream.messaging.Source;
 import org.springframework.cloud.stream.test.binder.MessageCollector;
+import org.springframework.context.annotation.Bean;
 import org.springframework.integration.endpoint.SourcePollingChannelAdapter;
 import org.springframework.integration.hazelcast.metadata.HazelcastMetadataStore;
 import org.springframework.integration.metadata.ConcurrentMetadataStore;
@@ -188,6 +190,31 @@ public abstract class SftpSourceIntegrationTests extends SftpTestSupport {
 			assertThat(getSourceRemoteDirectory().list().length, equalTo(0)); // deleted
 		}
 
+		@TestPropertySource(properties = { "sftp.stream = true",
+			"file.consumer.mode = contents",
+			"sftp.delete-remote-files = true",
+			"logging.level.org.springframework.integration=DEBUG",
+			"spring.cloud.stream.function.name=upper"})
+		public static class FunctionTests extends SftpSourceIntegrationTests {
+
+			@Test
+			public void streamSourceFilesAsContents() throws InterruptedException {
+				assertEquals(".*", TestUtils.getPropertyValue(TestUtils.getPropertyValue(this.sourcePollingChannelAdapter,
+					"source.filter.fileFilters", Set.class).iterator().next(), "pattern").toString());
+				for (int i = 1; i <= 2; i++) {
+					@SuppressWarnings("unchecked")
+					Message<byte[]> received = (Message<byte[]>) this.messageCollector.forChannel(sftpSource.output())
+						.poll(10, TimeUnit.SECONDS);
+					assertNotNull(received);
+					assertThat(new String(received.getPayload()), startsWith("SOURCE"));
+				}
+				int n = 0;
+				while (n++ < 100 && getSourceRemoteDirectory().list().length > 0) {
+					Thread.sleep(100);
+				}
+				assertThat(getSourceRemoteDirectory().list().length, equalTo(0)); // deleted
+			}
+
 	}
 
 	@TestPropertySource(properties = { "sftp.stream = true",
@@ -245,6 +272,15 @@ public abstract class SftpSourceIntegrationTests extends SftpTestSupport {
 
 	@SpringBootApplication
 	public static class SftpSourceApplication {
+
+		@Bean
+		Function<String, String> upper() {
+			return s -> {
+				System.out.println("*************************************** s");
+				return s.toUpperCase();
+			};
+		}
+	}
 
 	}
 
