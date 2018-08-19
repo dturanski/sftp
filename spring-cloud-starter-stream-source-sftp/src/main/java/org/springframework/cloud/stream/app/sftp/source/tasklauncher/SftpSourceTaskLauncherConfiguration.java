@@ -86,7 +86,7 @@ public class SftpSourceTaskLauncherConfiguration {
 	@Bean
 	@ConditionalOnProperty(name = "sftp.task-launcher-output", havingValue = "STANDALONE")
 	@IdempotentReceiver("idempotentReceiverInterceptor")
-	@ServiceActivator(inputChannel = "sftpFileTaskLaunchChannel", outputChannel = Source.OUTPUT)
+	@ServiceActivator(inputChannel = "sftpFileTaskLaunchChannel", outputChannel = "processOutput")
 	public MessageProcessor<Message> standaloneTaskLaunchRequestTransformer() {
 		return message -> {
 			TaskLaunchRequest outboundPayload = new TaskLaunchRequest(sftpSourceTaskProperties.getResourceUri(),
@@ -101,7 +101,7 @@ public class SftpSourceTaskLauncherConfiguration {
 	@Bean
 	@ConditionalOnProperty(name = "sftp.task-launcher-output", havingValue = "DATAFLOW")
 	@IdempotentReceiver("idempotentReceiverInterceptor")
-	@ServiceActivator(inputChannel = "sftpFileTaskLaunchChannel", outputChannel = Source.OUTPUT)
+	@ServiceActivator(inputChannel = "sftpFileTaskLaunchChannel", outputChannel = "processOutput")
 	public MessageProcessor<Message> dataflowTaskLauchRequestTransformer() {
 		return message -> {
 			DataFlowTaskLaunchRequest taskLaunchRequest = new DataFlowTaskLaunchRequest();
@@ -114,7 +114,6 @@ public class SftpSourceTaskLauncherConfiguration {
 				.build();
 		};
 	}
-
 
 	private Map<String, String> getEnvironmentProperties() {
 		Map<String, String> environmentProperties = new HashMap<>();

@@ -34,6 +34,10 @@ import org.springframework.cloud.stream.app.sftp.source.metadata.SftpSourceIdemp
 import org.springframework.cloud.stream.app.sftp.source.tasklauncher.SftpSourceTaskLauncherConfiguration;
 import org.springframework.cloud.stream.app.trigger.TriggerConfiguration;
 import org.springframework.cloud.stream.app.trigger.TriggerPropertiesMaxMessagesDefaultUnlimited;
+import org.springframework.cloud.stream.function.FunctionConfiguration;
+import org.springframework.cloud.stream.function.FunctionProperties;
+
+import org.springframework.cloud.stream.function.IntegrationFlowFunctionSupport;
 import org.springframework.cloud.stream.messaging.Source;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -78,10 +82,10 @@ import org.springframework.util.StringUtils;
  * @author David Turanski
  */
 @EnableBinding(Source.class)
-@EnableConfigurationProperties({ SftpSourceProperties.class, FileConsumerProperties.class })
+@EnableConfigurationProperties({ SftpSourceProperties.class, FileConsumerProperties.class, FunctionProperties.class })
 @Import({ TriggerConfiguration.class, SftpSourceSessionFactoryConfiguration.class,
 	TriggerPropertiesMaxMessagesDefaultUnlimited.class, SftpSourceIdempotentReceiverConfiguration.class,
-	SftpSourceTaskLauncherConfiguration.class })
+	SftpSourceTaskLauncherConfiguration.class, FunctionConfiguration.class })
 public class SftpSourceConfiguration {
 
 	@Autowired
@@ -97,8 +101,12 @@ public class SftpSourceConfiguration {
 	@Autowired
 	private SftpSourceProperties properties;
 
+
 	@Autowired
 	private ConcurrentMetadataStore metadataStore;
+
+	@Autowired(required = false)
+	private IntegrationFlowFunctionSupport functionSupport;
 
 	@Bean
 	public MessageChannel sftpFileListChannel() {
@@ -107,6 +115,11 @@ public class SftpSourceConfiguration {
 
 	@Bean
 	public MessageChannel sftpFileTaskLaunchChannel() {
+		return new DirectChannel();
+	}
+
+	@Bean
+	public MessageChannel processOutput() {
 		return new DirectChannel();
 	}
 
@@ -171,8 +184,12 @@ public class SftpSourceConfiguration {
 			}
 		}
 
-		return flowBuilder.channel(this.source.output()).get();
+		flowBuilder = flowBuilder.channel(processOutput());
+
+		return flowBuilder.get();
 	}
+
+
 
 	private MessageChannel route(SftpSourceProperties properties) {
 		return properties.isListOnly() ? sftpFileListChannel() : sftpFileTaskLaunchChannel();
@@ -194,6 +211,19 @@ public class SftpSourceConfiguration {
 	}
 
 	@Bean
+	public IntegrationFlow sftpProcessOutput( FunctionProperties functionProperties) {
+		IntegrationFlowBuilder flowBuilder = IntegrationFlows.from(processOutput());
+		if (functionSupport != null) {
+			functionSupport.andThenFunction(flowBuilder,source.output());
+		}
+		else {
+			flowBuilder = flowBuilder.channel(source.output());
+		}
+		return flowBuilder.get();
+	}
+
+
+	@Bean
 	@ConditionalOnProperty(name = "sftp.stream")
 	public SftpRemoteFileTemplate sftpTemplate(SessionFactory<LsEntry> sftpSessionFactory) {
 		return new SftpRemoteFileTemplate(sftpSessionFactory);
@@ -202,7 +232,7 @@ public class SftpSourceConfiguration {
 	//TODO: This COP doesn't apply since not a bean
 	@ConditionalOnProperty(name = "sftp.listOnly")
 	@IdempotentReceiver("idempotentReceiverInterceptor")
-	@ServiceActivator(inputChannel = "sftpFileListChannel", outputChannel = Source.OUTPUT)
+	@ServiceActivator(inputChannel = "sftpFileListChannel", outputChannel = "processOutput")
 	public Message transformSftpMessage(Message message) {
 		MessageHeaders messageHeaders = message.getHeaders();
 		Assert.notNull(messageHeaders, "Cannot transform message with null headers");
